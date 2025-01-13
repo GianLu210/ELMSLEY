@@ -22,16 +22,19 @@ from sklearn.cluster import KMeans
 
 class Training_obj():
 
-    def __init__(self, data, oversample=False, undersample=False,
+    def __init__(self, data, selected_features=None, test_size=0.3, min_samples_per_patient=None, oversample=False, undersample=False,
                  oversampling_method='ADASYN', cascade=False, inter_patient=False, cross_dataset=False,
-                 excluded_labels=None, results_folder='results', use_grid_search=False, scale_features=False,
-                 explain=False):
+                 train_datasets=None, test_datasets=None, excluded_labels=[], results_folder='results',
+                 use_grid_search=False, scale_features=False, explain=False):
         self.data = data
+        self.selected_features = selected_features
+        self.test_size = test_size
+        self.min_samples_per_patient = min_samples_per_patient
         self.oversample = oversample
         self.undersample = undersample
         self.oversampling_method = oversampling_method
         self.cascade = cascade
-        self.excluded_labels = excluded_labels
+        self.excluded_labels = excluded_labels + ['None']
         self.results_folder = results_folder
         self.use_grid_search = use_grid_search
         self.label_encoder = LabelEncoder()
@@ -40,6 +43,9 @@ class Training_obj():
         self.explain = explain
         self.inter_patient = inter_patient
         self.cross_dataset = cross_dataset
+        self.train_datasets = train_datasets
+        self.test_datasets = test_datasets
+        self.external_test = None
 
     def get_true_negative(self, best_model, x_test, y_test):
         y_pred = best_model.predict(x_test)
@@ -128,28 +134,38 @@ class Training_obj():
 
     def splitting(self, min_test_size=0.1):
 
-        if self.excluded_labels != []:
+        if self.selected_features is not None:
+            self.data = self.data[['dataset', 'sample', 'ECG_label'] + self.selected_features]
+
+        if self.min_samples_per_patient is not None:
+            counts = self.data['sample'].value_counts()
+            valid_patients = counts[counts >= self.min_samples_per_patient].index
+            self.data = self.data[self.data['sample'].isin(valid_patients)]
+
+        if self.excluded_labels is not None:
             self.data = self.data[~self.data['ECG_label'].isin(self.excluded_labels)]
 
         # Escludo Incart dal train
-        if self.cross_dataset:
-            train = self.data[self.data['sample'].str.contains('I')]
-            self.external_test = self.data[~self.data['sample'].str.contains('I')]
+        if self.cross_dataset and self.train_datasets is not None or self.test_datasets is not None:
+            if self.train_datasets is not None:
+                train = self.data[self.data['dataset'].isin(self.train_datasets)]
+                self.external_test = self.data[~self.data['dataset'].isin(self.train_datasets)]
+            elif self.test_datasets is not None:
+                train = self.data[~self.data['dataset'].isin(self.test_datasets)]
+                self.external_test = self.data[self.data['dataset'].isin(self.test_datasets)]
 
         else:
             train = self.data
-            self.x_external = []
-            self.y_external = []
+
 
         grouped = train.groupby('sample')['ECG_label'].first().reset_index()
 
         # Uso GroupShuffleSplit per fare una suddivisione stratificata
         valid_splits = []
         valid_split = False
-        test_size = 0.30
-        while not valid_split and test_size >= 0.1:
+        while not valid_split and self.test_size >= 0.1:
 
-            splitter = GroupShuffleSplit(n_splits=5, test_size=test_size, random_state=42)
+            splitter = GroupShuffleSplit(n_splits=5, test_size=self.test_size, random_state=42)
 
             # Divido i gruppi di sample in train e test
             for train_idx, test_idx in splitter.split(grouped, grouped['ECG_label'], groups=grouped['sample']):
@@ -170,9 +186,10 @@ class Training_obj():
                 if 0.6 <= train_ratio <= 0.7 and test_ratio >= min_test_size:
                     valid_split = True
                     valid_splits.append((train_df, test_df))
+                    print(f'Best splitting obtained for split number {len(valid_splits)}: train:{train_ratio}; test: {test_ratio}')
                     break
                 else:
-                    test_size = test_size - 0.01
+                    self.test_size = self.test_size - 0.01
 
 
         return valid_splits
@@ -243,8 +260,8 @@ class Training_obj():
 
                     print()
                 else:
-                    self._train_once(self.x_train, self.y_train, self.x_test, self.y_test, self.x_external, self.y_external,
-                                     self.label_encoder, model_name, model_config)
+                    self._train_once(self.x_train, self.y_train, self.x_test, self.y_test, self.x_external,
+                                     self.y_external, self.label_encoder, model_name, model_config)
 
     def _resample(self, x_train, y_train):
         if self.oversample:
@@ -350,6 +367,7 @@ class Training_obj():
         cm_test_df.to_csv(f"{model_folder}/{model_name}_{stage_name}_test_confusion_matrix.csv")
 
         if self.cross_dataset:
+
             y_external_decoded = label_encoder.inverse_transform(y_external)
             y_pred_external = model.predict(x_external)
             y_pred_external_decoded = label_encoder.inverse_transform(y_pred_external)
@@ -508,9 +526,9 @@ class Training_obj():
         y = df['ECG_label']  # Target
         groups = df['sample']  # Identificativo paziente
 
-        for id in df['sample'].unique():
-            if len(df[df['sample'] == id]) == 1:
-                df = df[df['sample'] != id]
+        filtered_patients = [id for id in df['sample'].unique() if len(df[df['sample'] == id]) >= 300]
+        df = df[df['sample'].isin(filtered_patients)]
+
 
         gkf = GroupKFold(n_splits=len(df['sample'].unique()))  # Una fold per ogni paziente
 

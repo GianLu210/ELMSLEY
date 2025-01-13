@@ -36,7 +36,7 @@ def feature_extraction(db_dict, pre_proc_dir='pre_processed', complete_dataset_n
                  if os.path.splitext(file_name)[-1] in {'.pickle'}]
 
         for file in tqdm.tqdm(files, desc=f'Extracting features...'):
-            with open(os.path.join(pre_proc_dir, db_name, file), 'rb') as pickle_file:
+            with open(f"{os.path.join(pre_proc_dir, db_name, file)}.pickle", 'rb') as pickle_file:
                 seg_pickle = pickle.load(pickle_file)
             label = os.path.splitext(file)[0].split('_')[-1]
             fs = seg_pickle['fs']

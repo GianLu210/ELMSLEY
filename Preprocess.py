@@ -11,7 +11,7 @@ AAMI_dict = {'N': ['N', 'L', 'R', 'e', 'j'], 'SVEB': ['A', 'a', 'J', 'S'],
 
 class Preprocess:
 
-    def __init__(self, db_dict, pre_proc_dir='pre_processed', rec_len=30, filtering_method='vg', derivation='MLII', label_dict=None):
+    def __init__(self, db_dict, pre_proc_dir='pre_processed', rec_len=30, filtering_method='vg', label_dict=None):
         '''
 
         :param db_dict: {'MIT-ARR': {'db_dir': 'data_directory_path', 'ann_ext': 'annotation_extension', 'derivation': 'MLII'},
@@ -56,7 +56,7 @@ class Preprocess:
         ds_split_dir = os.path.join(self.pre_proc_dir, db_name, 'split')
         os.makedirs(ds_split_dir, exist_ok=True)
         os.makedirs(os.path.join(ds_split_dir, patient), exist_ok=True)
-        print('Inizio splitting dei record')
+        print(f'Inizio splitting dei record per il dataset {db_name}')
 
         n_samples = record.fs * self.rec_len * 60
         sample = 0
@@ -69,22 +69,24 @@ class Preprocess:
                 seg['symbol'] = [sy for sy, s in zip(ann.symbol, ann.sample) if
                                  s >= sample and s < sample + n_samples]
                 seg['fs'] = record.fs
-
-                with open(os.path.join(ds_split_dir, patient, f'{patient}_{n_seg}.pickle'), 'wb') as file:
-                    pickle.dump(seg, file)
                 sample += n_samples
-                n_seg += 1
-                print(f'Segmento {n_seg} del paziente {patient} salvato!')
+                if seg['annotation'] and seg['symbol']:
+                    with open(os.path.join(ds_split_dir, patient, f'{patient}_{n_seg}.pickle'), 'wb') as file:
+                        pickle.dump(seg, file)
+                    n_seg += 1
+                    print(f'Segmento {n_seg} del paziente {patient} salvato!')
 
             else:
                 seg['p_signal'] = record.p_signal[:, 0][sample:]
                 seg['annotation'] = [s for s in ann.sample if s >= sample and s < len(record.p_signal[:, derivation_idx])]
                 seg['symbol'] = ann.symbol[sample:]
                 seg['fs'] = record.fs
-                with open(os.path.join(ds_split_dir, patient, f'{patient}_{n_seg}.pickle'), 'wb') as file:
-                    pickle.dump(seg, file)
-                print(f'Segmento {n_seg + 1} del paziente {patient} salvato!')
                 sample += n_samples
+                if seg['annotation'] and seg['symbol']:
+                    with open(os.path.join(ds_split_dir, patient, f'{patient}_{n_seg}.pickle'), 'wb') as file:
+                        pickle.dump(seg, file)
+                    print(f'Segmento {n_seg + 1} del paziente {patient} salvato!')
+
 
     def _pre_process(self, db_name, patient, record=None, ann=None, derivation_idx=None, split=False):
 
@@ -118,11 +120,12 @@ class Preprocess:
 
     def _save_information(self, db_name, patient, p_signal, ann_sample, ann_symbol, fs):
         seg_idx = 0
-
+        print("Filtering Signal...")
         clean_ecg = nk.ecg_clean(p_signal, sampling_rate=fs,
                                  method=self.filtering_method)
+        print("Start Segmentation...")
         peaks = nk.ecg_delineate(clean_ecg, ann_sample, sampling_rate=fs, method='dwt')
-        print('Segmentazione Effettuata')
+        print(f'Segmentazione del paziente {patient} Effettuata')
 
         peaks_df = peaks[0].copy()
         peaks_df['ECG_R_Peaks'] = np.zeros(len(peaks_df), dtype=np.int8)
@@ -162,7 +165,7 @@ class Preprocess:
                             with open(pickle_name, 'wb') as file:
                                 pickle.dump({'fs': fs, 'seg_df': seg_df}, file)
                             seg_idx += 1
-                            print('Segmento salvato')
+                            print(f'Segmento {seg_idx} salvato del paziente {patient}')
                     else:
                         break
             except Exception as e:

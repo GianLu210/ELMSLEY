@@ -8,18 +8,18 @@ from sklearn.metrics import make_scorer, recall_score
 import pandas as pd
 
 
-def perform_RFE(complete_dataset_name='complete_dataset', estimator=RandomForestClassifier(random_state=42),
+def perform_RFE(min_samples_per_patient, excluded_labels=[], complete_dataset_name='complete_dataset', estimator=RandomForestClassifier(random_state=42),
                 scaler=RobustScaler()):
     scaler = scaler
     with open(f'{complete_dataset_name}.pickle', 'rb') as file:
         df = pickle.load(file)
 
-    df = df.replace(['None', 'F', 'Q'], np.nan)
+    df = df.replace(excluded_labels, np.nan)
     df = df.dropna()
 
     counts = df['sample'].value_counts()
 
-    valid_patients = counts[counts >= 300].index
+    valid_patients = counts[counts >= min_samples_per_patient].index
 
     df = df[df['sample'].isin(valid_patients)]
 
@@ -33,18 +33,18 @@ def perform_RFE(complete_dataset_name='complete_dataset', estimator=RandomForest
     y = label_encoder.fit_transform(y)
 
     # Estrai le features X, escludendo la colonna 'ECG_label'
-    X_original = dataset_senza_missing.drop(columns=['sample', 'ECG_label'])
+    X_original = dataset_senza_missing.drop(columns=['dataset', 'sample', 'ECG_label'])
     X_scaled = scaler.fit_transform(X_original)
 
     X = pd.DataFrame(X_scaled, columns=X_original.columns)
 
-    scorer = make_scorer(recall_score, average='weighted')
+    scorer = make_scorer(recall_score, average='macro')
 
     rfecv_selector = RFECV(estimator=estimator, step=1, cv=StratifiedKFold(10),
                            scoring=scorer, verbose=3)
 
     rfecv_selector.fit(X, y)
-    rfecv_selector.ranking_.tofile('ranking.csv', sep=',')
+    rfecv_selector.ranking_.tofile('ranking.xlsx', sep=',')
 
     with open('rfe_selector.pickle', 'wb') as rfecv_selector_file:
         pickle.dump(rfecv_selector, rfecv_selector_file)
