@@ -1,0 +1,12 @@
+models:
+  "LogisticRegression": sklearn.linear_model.LogisticRegression,
+
+  "RandomForest": sklearn.ensemble.RandomForestClassifier,
+
+  "XGBoost": xgboost.XGBClassifier,
+
+  "LightGBM": lightgbm.LGBMClassifier,
+
+  "MLPClassifier": sklearn.neural_network.MLPClassifier,
+
+  "SVM": sklearn.svm.SVC

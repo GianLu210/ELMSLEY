@@ -1,0 +1,42 @@
+# Database configuration
+databases:
+  MIT-ARR:
+    db_dir: "MIT-ARR"
+    ann_ext: "atr"
+    derivation: "MLII"
+  MIT-NSR:
+    db_dir: "MIT-NSR"
+    ann_ext: "atr"
+    derivation: "ECG1"
+  INCART:
+    db_dir: "INCART"
+    ann_ext: "atr"
+    derivation: "II"
+
+# Preprocessing configuration
+preprocessing:
+  pre_proc_dir: "pre_processed"
+  complete_dataset_name: "complete_dataset"
+  min_samples_per_patient: 300
+
+# Feature selection configuration
+feature_selection:
+  excluded_labels: ["None", "F", "Q"]
+
+# Training configuration
+training:
+  test_size: 0.3
+  min_samples_per_patient: 300
+  oversample: true
+  undersample: false
+  oversampling_method: ADASYN
+  inter_patient: true
+  cross_dataset: true
+  train_datasets: ["MIT-ARR", "MIT-NSR"]
+  test_datasets: ["INCART"]
+  excluded_labels: ["None", "F", "Q"]
+  results_folder: "results"
+  use_grid_search: false
+  scale_features: true
+  training_paradigm: LOSO
+
