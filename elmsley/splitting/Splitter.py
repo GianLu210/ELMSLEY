@@ -40,7 +40,7 @@ class Splitter:
             valid_split, valid_splits = self._try_splitting(train, grouped, min_test_size=min_test_size)
 
             if not valid_split:
-                self.test_size -= self.test_size
+                self.test_size -= 0.05
 
 
         if not valid_splits:
