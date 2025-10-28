@@ -5,7 +5,7 @@ ELMSLEY is an open‑source, YAML‑configurable ECG analysis framework for hear
 ## Quick start
 
 - Prerequisites
-  - Python 3.9–3.12, Git, and a virtual environment tool (venv or conda).[1]
+  - Python 3.9–3.12, Git, and a virtual environment tool (venv or conda).
 - Setup
 ```bash
 git clone https://github.com/GianLu210/ELMSLEY.git
@@ -259,3 +259,4 @@ Including quick tests helps users validate their environment before running larg
 
 
 ## Citation
+
